@@ -207,7 +207,23 @@ async function scenarioPrivilegeEscalation() {
     }
 }
 
-async function scenarioFullAttackChain() {
+async function scenarioStaticHoneypot() {
+    console.log('\n============================================================');
+    console.log('🤖 SCENARIO: Static Honeypot Benchmark');
+    console.log('============================================================');
+    
+    // Simulate a basic scan against a static honeypot
+    let result = await makeRequest('GET', '/');
+    logStep(1, 'GET', '/', result);
+    result = await makeRequest('GET', '/wp-admin');
+    logStep(2, 'GET', '/wp-admin', result);
+    result = await makeRequest('GET', '/phpmyadmin');
+    logStep(3, 'GET', '/phpmyadmin', result);
+    
+    // Usually static honeypots just return identical generic 404s or 200s
+}
+
+async function scenarioFullAdaptiveAttack() {
     console.log('\n' + '🏴‍☠️ '.repeat(20));
     console.log('   FULL ATTACK CHAIN SIMULATION');
     console.log('🏴‍☠️ '.repeat(20));
@@ -290,9 +306,14 @@ async function main() {
         case 'privilege-escalation':
             await scenarioPrivilegeEscalation();
             break;
-        case 'full-attack-chain':
+        case 'full-adaptive-attack':
+            await scenarioFullAdaptiveAttack();
+            break;
+        case 'static-honeypot':
+            await scenarioStaticHoneypot();
+            break;
         default:
-            await scenarioFullAttackChain();
+            console.log('Unknown scenario. Available: recon, enumeration, credential-harvest, canary-reuse, privilege-escalation, full-adaptive-attack, static-honeypot');
             break;
     }
 

@@ -139,8 +139,20 @@ async function revealAsset(sessionId, assetType, asset) {
         );
     }
 
+    // Compute deception depth (1 point per category of asset discovered, max 5)
+    let depth = 0;
+    if (state.revealedEndpoints.length > 0) depth++;
+    if (state.revealedServices.length > 0 || state.revealedDatabases.length > 0) depth++;
+    if (state.revealedEmployees.length > 0) depth++;
+    if (state.revealedCredentials.length > 0 || state.revealedConfigs.length > 0) depth++;
+    if (state.revealedCloudResources.length > 0 || Object.keys(state.revealedNetwork).length > 0) depth++;
+    
+    if (depth > session.deceptionDepth) {
+        session.deceptionDepth = depth;
+    }
+
     await sessionManager.saveSession(session);
-    log.info('Asset revealed', { sessionId, assetType, asset: assetName });
+    log.info('Asset revealed', { sessionId, assetType, asset: assetName, depth: session.deceptionDepth });
 }
 
 // ── Stage Progression ───────────────────────────────────────────────────────
@@ -234,6 +246,25 @@ function selectAssetsForPath(path, method) {
     return assets;
 }
 
+// ── Deception Strategy ──────────────────────────────────────────────────────
+
+/**
+ * Determines the best deception strategy based on the attacker's behavioral profile.
+ */
+function getDeceptionStrategy(session) {
+    const profile = session.attackerProfile;
+    if (!profile) return 'RECON_DECEPTION';
+
+    const type = profile.attackerType;
+    if (type === 'credential_hunting') return 'CREDENTIAL_DECEPTION';
+    if (type === 'data_discovery') return 'DATABASE_DECEPTION';
+    if (type === 'privilege_escalation') return 'ADMIN_DECEPTION';
+    if (type === 'exploitation') return 'PRIVILEGE_DECEPTION';
+    
+    // Default/Fallback
+    return 'RECON_DECEPTION';
+}
+
 module.exports = {
     ATTACK_STAGES,
     createDefaultState,
@@ -241,5 +272,6 @@ module.exports = {
     revealAsset,
     progressStage,
     getConsistentContext,
-    selectAssetsForPath
+    selectAssetsForPath,
+    getDeceptionStrategy
 };

@@ -14,33 +14,18 @@
 // service returns empty results rather than failing the pipeline.
 // ============================================================================
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const supabase     = require('../../config/db');
 const { KNOWLEDGE_BASE } = require('../data/syntheticEnterprise');
 const { createLogger }   = require('../utils/logger');
+const orchestrator = require('./models/modelOrchestrator');
 
 const log = createLogger('RAGService');
-
-let embeddingModel = null;
-
-function getEmbeddingModel() {
-    if (!process.env.GEMINI_API_KEY) return null;
-    if (!embeddingModel) {
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
-    }
-    return embeddingModel;
-}
 
 // ── Embedding Generation ────────────────────────────────────────────────────
 
 async function generateEmbedding(text) {
-    const model = getEmbeddingModel();
-    if (!model) return null;
-
     try {
-        const result = await model.embedContent(text);
-        return result.embedding.values;
+        return await orchestrator.embedText(text);
     } catch (err) {
         log.error('Embedding generation failed', { error: err.message });
         return null;

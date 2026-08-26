@@ -107,6 +107,18 @@ router.get('/attacks/:sessionId/timeline', async (req, res) => {
     }
 });
 
+// ── GET /attacks/:sessionId/replay ──────────────────────────────────────────
+
+router.get('/attacks/:sessionId/replay', async (req, res) => {
+    try {
+        const session = await sessionManager.getSession(req.params.sessionId);
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+        res.json({ sessionId: req.params.sessionId, replayEvents: session.replayEvents || [], total: (session.replayEvents || []).length });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to load replay', message: err.message });
+    }
+});
+
 // ── GET /attacks/:sessionId/assets ──────────────────────────────────────────
 
 router.get('/attacks/:sessionId/assets', async (req, res) => {
@@ -181,6 +193,23 @@ router.get('/system/health', (req, res) => {
 
 router.get('/system/metrics', (req, res) => {
     res.json(metricsCollector.getMetrics());
+});
+
+// ── GET /benchmark ──────────────────────────────────────────────────────────
+
+router.get('/benchmark', (req, res) => {
+    const m = metricsCollector.getMetrics();
+    // Simplified representation for the dashboard UI
+    res.json({
+        metrics: m,
+        staticModeEnabled: false, // Could be toggleable in a real UI
+        labyrinthAdvantage: {
+            adaptiveDeception: true,
+            canaryTracking: 'SESSION-BOUND',
+            threatProfiling: true,
+            engagementFactor: m.avgProcessingLatencyMs ? (m.avgProcessingLatencyMs / 42.0).toFixed(2) + 'x' : 'N/A' // placeholder comparison
+        }
+    });
 });
 
 // ── GET /events/stream (Server-Sent Events) ─────────────────────────────────

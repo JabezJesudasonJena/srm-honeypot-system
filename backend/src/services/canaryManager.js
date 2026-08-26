@@ -14,6 +14,7 @@ const { Alert, TimelineEntry } = require('../models/schemas');
 const { createLogger }   = require('../utils/logger');
 const sessionManager     = require('./sessionManager');
 const redisConnection    = require('../../config/redis');
+const metricsCollector   = require('./metricsCollector');
 
 const log = createLogger('CanaryManager');
 
@@ -175,6 +176,11 @@ async function triggerCanary(canaryId, triggeringEndpoint) {
         original: canary.exposureEndpoint,
         triggeredAt: triggeringEndpoint
     });
+
+    if (session) {
+        const detectionTimeMs = new Date(canary.triggerTimestamp).getTime() - new Date(session.firstSeen).getTime();
+        metricsCollector.increment('totalDetectionTimeMs', detectionTimeMs);
+    }
 
     return {
         triggered: true,

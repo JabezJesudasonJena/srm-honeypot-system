@@ -30,6 +30,7 @@ const ragService       = require('../src/services/ragService');
 const aiService        = require('../src/services/aiService');
 const fallbackEngine   = require('../src/services/fallbackEngine');
 const metricsCollector = require('../src/services/metricsCollector');
+const attackerProfiler = require('../src/services/attackerProfiler');
 const { AttackEvent }  = require('../src/models/schemas');
 
 const log = createLogger('RAGWorker');
@@ -85,8 +86,13 @@ const worker = new Worker('attacker-probes', async (job) => {
             });
         }
 
-        // ── 3. Progress Attack Stage ──
+        // ── 3. Attacker Profiling & Stage ──
         const stage = intentDetector.intentToStage(intent.intent);
+        const session = await sessionManager.getSession(sessionId);
+        if (session) {
+            attackerProfiler.updateProfile(session, intent.intent);
+            await sessionManager.saveSession(session);
+        }
         await deceptionEngine.progressStage(sessionId, stage);
 
         // ── 4. Reveal Assets Based on Path ──
@@ -137,7 +143,17 @@ const worker = new Worker('attacker-probes', async (job) => {
                 metricsCollector.increment('totalAiMs', aiLatency);
 
                 if (aiResponse) {
-                    log.info('AI deception generated', { latency: `${aiLatency}ms` });
+                    log.info('AI deception generated', { latency: `${aiLatency}ms`, provider: aiResponse.provider });
+                    
+                    // Generate a decision explanation for the dashboard
+                    aiResponse.explanation = {
+                        intent: intent.intent,
+                        confidence: intent.confidence,
+                        evidence: intent.reasons,
+                        retrievedContext: ragContext.map(r => r.title),
+                        selectedStrategy: deceptionEngine.getDeceptionStrategy(session),
+                        reason: `Attacker profiling indicates ${session?.attackerProfile?.attackerType || 'unknown'} behavior. Strategy selected dynamically.`
+                    };
 
                     // Process new assets from AI response
                     if (aiResponse.newAssets && Array.isArray(aiResponse.newAssets)) {
@@ -187,6 +203,27 @@ const worker = new Worker('attacker-probes', async (job) => {
         }
 
         await sessionManager.addEvent(event);
+
+        // Add to replay events
+        if (session) {
+            const replayEvent = {
+                timestamp: event.timestamp,
+                sessionId: session.sessionId,
+                eventType: intent.intent.toUpperCase(),
+                endpoint: event.path,
+                intent: event.intent,
+                threatScore: session.threatScore,
+                deceptionDepth: session.deceptionDepth,
+                canaryId: event.canaryEvents.length > 0 ? event.canaryEvents[0].canaryId : null,
+                metadata: {
+                    aiGenerated: event.aiGenerated,
+                    explanation: aiResponse?.explanation || null
+                }
+            };
+            if (!session.replayEvents) session.replayEvents = [];
+            session.replayEvents.push(replayEvent);
+            await sessionManager.saveSession(session);
+        }
 
         // ── 8. Update Metrics ──
         metricsCollector.increment('totalProcessingMs', event.processingLatencyMs);

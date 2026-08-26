@@ -16,12 +16,16 @@ const metrics = {
     totalProcessingMs:   0,
     totalAiMs:           0,
     aiCalls:             0,
+    orchestratorRequests:0,
+    geminiCalls:         0,
+    hfCalls:             0,
     queueDepth:          0,
     canariesGenerated:   0,
     canariesTriggered:   0,
     criticalAlerts:      0,
     aiFailures:          0,
     fallbackActivations: 0,
+    totalDetectionTimeMs:0, // Sum of (canaryTrigger - attackStart)
     startedAt:           new Date().toISOString()
 };
 
@@ -46,6 +50,9 @@ function getMetrics() {
             : 0,
         avgAiLatencyMs: metrics.aiCalls > 0
             ? Math.round(metrics.totalAiMs / metrics.aiCalls)
+            : 0,
+        avgTimeToDetectionMs: metrics.canariesTriggered > 0
+            ? Math.round(metrics.totalDetectionTimeMs / metrics.canariesTriggered)
             : 0,
         uptimeSeconds: uptime
     };

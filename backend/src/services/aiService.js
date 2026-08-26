@@ -11,31 +11,13 @@
 // with the current deception state.
 // ============================================================================
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { validateJsonResponse, sanitizeAiOutput } = require('../utils/jsonValidator');
+const orchestrator = require('./models/modelOrchestrator');
+const { validateJsonResponse } = require('../utils/jsonValidator');
 const { createLogger } = require('../utils/logger');
 
 const log = createLogger('AIService');
-
-const AI_ENABLED    = (process.env.AI_ENABLED || 'true') === 'true';
+const AI_ENABLED = (process.env.AI_ENABLED || 'true') === 'true';
 const AI_MAX_RETRIES = parseInt(process.env.AI_MAX_RETRIES) || 2;
-
-let genAI = null;
-let model = null;
-
-// Lazy initialization — only create the client when first needed
-function getModel() {
-    if (!AI_ENABLED) return null;
-    if (!process.env.GEMINI_API_KEY) {
-        log.warn('GEMINI_API_KEY not set — AI deception disabled');
-        return null;
-    }
-    if (!genAI) {
-        genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    }
-    return model;
-}
 
 // ── System Prompt ───────────────────────────────────────────────────────────
 
@@ -66,32 +48,33 @@ You are generating responses for a HONEYPOT — your goal is to make the attacke
  * @returns {object|null}               – Parsed JSON response or null on failure
  */
 async function generateDeception({ request, intent, deceptionState, ragContext = [], objective }) {
-    const m = getModel();
-    if (!m) return null;
+    if (!AI_ENABLED) return null;
 
     const prompt = buildPrompt({ request, intent, deceptionState, ragContext, objective });
 
     for (let attempt = 1; attempt <= AI_MAX_RETRIES; attempt++) {
         try {
             const startTime = Date.now();
-            const result = await m.generateContent({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-                generationConfig: {
-                    temperature: 0.7,
-                    topP: 0.9,
-                    maxOutputTokens: 1024,
-                    responseMimeType: 'application/json'
-                }
+            
+            const result = await orchestrator.generateDeception(prompt, {
+                systemInstruction: SYSTEM_PROMPT,
+                format: 'json',
+                temperature: 0.7,
+                maxOutputTokens: 1024
             });
-            const latency = Date.now() - startTime;
 
-            const text = result.response?.text?.() || '';
+            if (!result || !result.text) {
+                log.warn(`AI provider returned null (attempt ${attempt})`);
+                continue;
+            }
+
+            const latency = Date.now() - startTime;
+            const text = result.text;
             const validation = validateJsonResponse(text, ['statusCode', 'body']);
 
             if (validation.valid) {
-                log.info('AI deception generated', { intent, latency: `${latency}ms`, attempt });
-                return { ...validation.data, aiGenerated: true, latencyMs: latency };
+                log.info('AI deception generated', { intent, provider: result.provider, latency: `${latency}ms`, attempt });
+                return { ...validation.data, aiGenerated: true, provider: result.provider, latencyMs: latency };
             }
 
             log.warn(`AI output validation failed (attempt ${attempt})`, { error: validation.error });
@@ -145,8 +128,7 @@ Remember: ALL data must be FICTIONAL. Maintain consistency with the deception st
  * Generate a threat intelligence summary for a completed attack session.
  */
 async function generateThreatReport(sessionData) {
-    const m = getModel();
-    if (!m) return null;
+    if (!AI_ENABLED) return null;
 
     const prompt = `Generate a threat intelligence report for the following attack session.
 The report should be a professional executive summary suitable for a SOC team.
@@ -166,18 +148,16 @@ ${JSON.stringify(sessionData, null, 2)}
 IMPORTANT: Base ALL facts on the session data provided. Do NOT invent attack events that are not in the data.`;
 
     try {
-        const result = await m.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            generationConfig: {
-                temperature: 0.5,
-                maxOutputTokens: 2048,
-                responseMimeType: 'application/json'
-            }
+        const result = await orchestrator.generateDeception(prompt, {
+            systemInstruction: SYSTEM_PROMPT,
+            format: 'json',
+            temperature: 0.5,
+            maxOutputTokens: 2048
         });
 
-        const text = result.response?.text?.() || '';
-        const validation = validateJsonResponse(text, ['executiveSummary']);
+        if (!result || !result.text) return null;
+
+        const validation = validateJsonResponse(result.text, ['executiveSummary']);
         return validation.valid ? validation.data : null;
     } catch (err) {
         log.error('Threat report generation failed', { error: err.message });
@@ -186,7 +166,7 @@ IMPORTANT: Base ALL facts on the session data provided. Do NOT invent attack eve
 }
 
 function isAvailable() {
-    return AI_ENABLED && !!process.env.GEMINI_API_KEY;
+    return AI_ENABLED && (!!process.env.GEMINI_API_KEY || !!process.env.HF_API_KEY);
 }
 
 module.exports = { generateDeception, generateThreatReport, isAvailable };

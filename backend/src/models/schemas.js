@@ -37,9 +37,24 @@ class AttackSession {
         this.threatSeverity    = 'LOW';
         this.threatReasons     = [];
         this.classification    = 'unknown';
+        this.attackerProfile   = {
+            behavior: {
+                reconnaissance: 0.0,
+                enumeration: 0.0,
+                credential_hunting: 0.0,
+                exploitation: 0.0,
+                data_discovery: 0.0,
+                privilege_escalation: 0.0
+            },
+            automationProbability: 0.0,
+            attackerType: 'unknown',
+            confidence: 0.0
+        };
+        this.deceptionDepth    = 0;
         this.deceptionState    = {};
         this.attackStage       = 'initial';
         this.timeline          = [];
+        this.replayEvents      = [];
         this.active            = true;
     }
 
