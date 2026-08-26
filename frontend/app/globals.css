@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cyber-bg: #050a0f;
+  --color-cyber-panel: #0d1520;
+  --color-cyber-border: #1a2735;
+  --color-cyber-primary: #00ff9d;
+  --color-cyber-accent: #00b8ff;
+  --color-cyber-alert: #ff2a2a;
+  --color-cyber-warning: #ffb300;
+  --color-cyber-text: #e2e8f0;
+  --color-cyber-muted: #64748b;
+  
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+@layer base {
+  :root {
+    --background: var(--color-cyber-bg);
+    --foreground: var(--color-cyber-text);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background: rgba(13, 21, 32, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--color-cyber-border);
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
+  }
+
+  .alert-glow {
+    box-shadow: 0 0 15px rgba(255, 42, 42, 0.5);
+    animation: pulse-alert 2s infinite;
+  }
+}
+
+@keyframes pulse-alert {
+  0% { box-shadow: 0 0 15px rgba(255, 42, 42, 0.5); }
+  50% { box-shadow: 0 0 25px rgba(255, 42, 42, 0.8); }
+  100% { box-shadow: 0 0 15px rgba(255, 42, 42, 0.5); }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.scanline::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 10vh;
+  background: linear-gradient(to bottom, transparent, rgba(0, 255, 157, 0.05), transparent);
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+  z-index: 50;
+}
