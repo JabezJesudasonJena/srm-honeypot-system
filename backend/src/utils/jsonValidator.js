@@ -35,6 +35,13 @@ function validateJsonResponse(raw, requiredFields = []) {
             }
         }
 
+        // Security check: Drop responses that contain dangerous OS artifacts
+        // (Prevents prompt injection leading to simulated or real exposure)
+        const jsonStr = JSON.stringify(parsed).toLowerCase();
+        if (jsonStr.includes('/etc/passwd') || jsonStr.includes('cmd.exe') || jsonStr.includes('/bin/sh') || jsonStr.includes('c:\\windows')) {
+            return { valid: false, error: 'Dangerous payload pattern detected in AI output', data: null };
+        }
+
         return { valid: true, error: null, data: parsed };
     } catch (err) {
         return { valid: false, error: `JSON parse error: ${err.message}`, data: null };

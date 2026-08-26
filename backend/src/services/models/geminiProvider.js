@@ -17,8 +17,8 @@ class GeminiProvider extends ModelProvider {
         
         if (this.isAvailable()) {
             this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            this.textModel = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-            this.embedModel = this.genAI.getGenerativeModel({ model: 'embedding-001' });
+            this.textModel = this.genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+            this.embedModel = this.genAI.getGenerativeModel({ model: 'text-embedding-004' });
         }
     }
 

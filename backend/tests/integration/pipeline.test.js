@@ -198,6 +198,19 @@ async function runTests() {
     const sqliProbe = await makeRequest('POST', '/api/login', { username: "admin' OR 1=1 --", password: 'test' });
     assert('SQLi probe returns response', sqliProbe.status > 0);
 
+    // ── Test 10: Deception Consistency ──
+    console.log('\n📋 Test 10: Deception Consistency');
+    const dept1 = await makeRequest('GET', '/api/department');
+    const dept2 = await makeRequest('GET', '/api/department');
+    assert('Consistent deception for same path', JSON.stringify(dept1.body) === JSON.stringify(dept2.body));
+
+    // ── Test 11: Demo Reset Mode ──
+    console.log('\n📋 Test 11: Demo Reset Mode');
+    const reset = await makeRequest('POST', '/labyrinth-api/system/reset');
+    assert('Reset endpoint returns 200', reset.status === 200);
+    const postResetMetrics = await makeRequest('GET', '/labyrinth-api/system/metrics');
+    assert('Metrics are zeroed out after reset', postResetMetrics.body?.totalAttacks === 0);
+
     // ── Summary ──
     console.log('\n' + '='.repeat(60));
     console.log(`🏁 Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);

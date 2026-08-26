@@ -153,6 +153,73 @@ router.get('/attacks/:sessionId/canaries', async (req, res) => {
     }
 });
 
+// ── GET /attacks/:sessionId/decision ────────────────────────────────────────
+
+router.get('/attacks/:sessionId/decision', async (req, res) => {
+    try {
+        const session = await sessionManager.getSession(req.params.sessionId);
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+        
+        // Return the latest replay event that is an AI or fallback decision
+        const decisionEvents = session.replayEvents?.filter(e => e.eventType === 'AI_DECISION' || e.eventType === 'FALLBACK_DECISION') || [];
+        const latest = decisionEvents[decisionEvents.length - 1];
+        
+        if (!latest) return res.json({ decision: null });
+        
+        res.json({
+            decision: {
+                intent: latest.details,
+                strategy: latest.metadata?.strategy,
+                provider: latest.metadata?.provider,
+                timestamp: latest.timestamp,
+                depth: latest.deceptionDepth
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to load decision', message: err.message });
+    }
+});
+
+// ── GET /attacks/:sessionId/graph ───────────────────────────────────────────
+
+router.get('/attacks/:sessionId/graph', async (req, res) => {
+    try {
+        const session = await sessionManager.getSession(req.params.sessionId);
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+        
+        const state = session.deceptionState || deceptionEngine.createDefaultState();
+        
+        const graph = {
+            nodes: [
+                { id: 'ROOT', label: state.company || 'Enterprise', group: 'company' }
+            ],
+            edges: []
+        };
+        
+        const addNodes = (items, group) => {
+            if (!items) return;
+            items.forEach(item => {
+                const id = item.id || item.name || item.username || item.bucketName || item.instanceId || item;
+                const label = item.name || item.username || item.bucketName || item.instanceId || item;
+                if (!graph.nodes.find(n => n.id === id)) {
+                    graph.nodes.push({ id, label, group });
+                    graph.edges.push({ from: 'ROOT', to: id });
+                }
+            });
+        };
+        
+        addNodes(state.revealedServices, 'service');
+        addNodes(state.revealedDatabases, 'database');
+        addNodes(state.revealedEmployees, 'employee');
+        addNodes(state.revealedCredentials, 'credential');
+        addNodes(state.revealedCloudResources, 'cloud');
+        
+        res.json({ graph });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to build graph', message: err.message });
+    }
+});
+
 // ── GET /alerts ─────────────────────────────────────────────────────────────
 
 router.get('/alerts', async (req, res) => {
@@ -210,6 +277,19 @@ router.get('/benchmark', (req, res) => {
             engagementFactor: m.avgProcessingLatencyMs ? (m.avgProcessingLatencyMs / 42.0).toFixed(2) + 'x' : 'N/A' // placeholder comparison
         }
     });
+});
+
+// ── POST /system/reset (Demo Mode) ──────────────────────────────────────────
+
+router.post('/system/reset', async (req, res) => {
+    try {
+        const redisConnection = require('../config/redis');
+        await redisConnection.flushdb();
+        metricsCollector.resetMetrics();
+        res.json({ status: 'success', message: 'Environment reset for new demo.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Reset failed', message: err.message });
+    }
 });
 
 // ── GET /events/stream (Server-Sent Events) ─────────────────────────────────

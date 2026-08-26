@@ -34,12 +34,13 @@ function sessionTracker() {
 
             // Set a session cookie so the attacker's browser/tool correlates
             // future requests. Many scanners and browsers honour Set-Cookie.
+            res.cookie('labyrinth-sid', session.sessionId, {
+                httpOnly: true,
+                maxAge: parseInt(process.env.SESSION_TIMEOUT_MS) || 1800000,
+                sameSite: 'lax'
+            });
+
             if (isNew) {
-                res.cookie('labyrinth-sid', session.sessionId, {
-                    httpOnly: true,
-                    maxAge: parseInt(process.env.SESSION_TIMEOUT_MS) || 1800000,
-                    sameSite: 'lax'
-                });
 
                 await sessionManager.addTimelineEntry(
                     session.sessionId,

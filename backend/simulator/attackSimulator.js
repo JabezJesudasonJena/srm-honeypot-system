@@ -207,6 +207,79 @@ async function scenarioPrivilegeEscalation() {
     }
 }
 
+async function scenarioAutomatedScanner() {
+    console.log('\n🤖 SCENARIO: Automated Scanner');
+    console.log('='.repeat(60));
+    const steps = [
+        ['GET', '/'],
+        ['GET', '/robots.txt'],
+        ['GET', '/.env'],
+        ['GET', '/config'],
+        ['GET', '/admin'],
+        ['GET', '/api'],
+        ['GET', '/api/v1'],
+        ['GET', '/api/v2'],
+    ];
+    for (let i = 0; i < steps.length; i++) {
+        const result = await makeRequest(steps[i][0], steps[i][1]);
+        logStep(i + 1, steps[i][0], steps[i][1], result);
+        await sleep(DELAY_MS);
+    }
+}
+
+async function scenarioCredentialHunter() {
+    console.log('\n🔑 SCENARIO: Credential Hunter');
+    console.log('='.repeat(60));
+    const steps = [
+        ['GET', '/.env'],
+        ['GET', '/config'],
+        ['GET', '/api/auth'],
+        ['GET', '/api/users'],
+        ['GET', '/api/credentials'],
+        ['GET', '/api/aws'],
+    ];
+    for (let i = 0; i < steps.length; i++) {
+        const result = await makeRequest(steps[i][0], steps[i][1]);
+        logStep(i + 1, steps[i][0], steps[i][1], result);
+        await sleep(DELAY_MS);
+    }
+}
+
+async function scenarioDatabaseAttacker() {
+    console.log('\n🗄️  SCENARIO: Database Attacker');
+    console.log('='.repeat(60));
+    const steps = [
+        ['GET', '/api/db'],
+        ['GET', '/api/database/status'],
+        ['GET', '/api/postgres'],
+        ['GET', '/api/mysql'],
+        ['POST', '/api/query', { sql: 'SELECT * FROM users' }],
+    ];
+    for (let i = 0; i < steps.length; i++) {
+        const [method, path, body] = steps[i];
+        const result = await makeRequest(method, path, body);
+        logStep(i + 1, method, path, result);
+        await sleep(DELAY_MS);
+    }
+}
+
+async function scenarioCloudAttacker() {
+    console.log('\n☁️  SCENARIO: Cloud Attacker');
+    console.log('='.repeat(60));
+    const steps = [
+        ['GET', '/api/aws'],
+        ['GET', '/api/cloud/config'],
+        ['GET', '/api/s3/buckets'],
+        ['GET', '/api/ec2/instances'],
+        ['GET', '/latest/meta-data/iam/security-credentials/'],
+    ];
+    for (let i = 0; i < steps.length; i++) {
+        const result = await makeRequest(steps[i][0], steps[i][1]);
+        logStep(i + 1, steps[i][0], steps[i][1], result);
+        await sleep(DELAY_MS);
+    }
+}
+
 async function scenarioStaticHoneypot() {
     console.log('\n============================================================');
     console.log('🤖 SCENARIO: Static Honeypot Benchmark');
@@ -309,11 +382,23 @@ async function main() {
         case 'full-adaptive-attack':
             await scenarioFullAdaptiveAttack();
             break;
+        case 'automated-scanner':
+            await scenarioAutomatedScanner();
+            break;
+        case 'credential-hunter':
+            await scenarioCredentialHunter();
+            break;
+        case 'database-attacker':
+            await scenarioDatabaseAttacker();
+            break;
+        case 'cloud-attacker':
+            await scenarioCloudAttacker();
+            break;
         case 'static-honeypot':
             await scenarioStaticHoneypot();
             break;
         default:
-            console.log('Unknown scenario. Available: recon, enumeration, credential-harvest, canary-reuse, privilege-escalation, full-adaptive-attack, static-honeypot');
+            console.log('Unknown scenario. Available: recon, enumeration, credential-harvest, canary-reuse, privilege-escalation, full-adaptive-attack, static-honeypot, automated-scanner, credential-hunter, database-attacker, cloud-attacker');
             break;
     }
 

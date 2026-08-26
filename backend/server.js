@@ -29,9 +29,15 @@ const PORT = process.env.PORT || 5000;
 
 // ── Standard Middleware ─────────────────────────────────────────────────────
 
+const { rateLimiter, timeoutHandler } = require('./src/middleware/security');
+
 // Parse JSON payloads (attackers send all sorts of things)
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+// Global security middleware
+app.use(timeoutHandler(15000));
+app.use(rateLimiter({ windowMs: 60000, max: 200 })); // 200 reqs/min
 
 // Enable CORS (honeypots should accept probes from anywhere)
 app.use(cors());
