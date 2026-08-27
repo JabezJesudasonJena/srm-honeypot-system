@@ -1,19 +1,14 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from "lucide-react";
 
 interface LoadingStateProps {
   message?: string;
 }
 
-export default function LoadingState({ message = "Processing request..." }: LoadingStateProps) {
+export default function LoadingState({ message = "Connecting to SOC API..." }: LoadingStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center p-8 space-y-4">
-      <div className="relative">
-        <Loader2 className="h-10 w-10 text-[var(--color-cyber-primary)] animate-spin" />
-        <div className="absolute inset-0 h-10 w-10 border-2 border-[var(--color-cyber-primary)] rounded-full border-t-transparent animate-[spin_2s_linear_infinite] opacity-30"></div>
-      </div>
-      <p className="font-mono text-sm text-[var(--color-cyber-primary)] animate-pulse">
-        {message}
-      </p>
+    <div className="flex flex-col items-center justify-center p-12 h-full w-full bg-[var(--color-soc-surface)]/50 rounded-xl border border-[var(--color-soc-border-light)] border-dashed min-h-[300px]">
+      <Loader2 className="w-8 h-8 text-[var(--color-soc-primary)] animate-spin mb-4" />
+      <p className="text-[var(--color-soc-text-secondary)] font-mono text-sm tracking-wide">{message}</p>
     </div>
   );
 }

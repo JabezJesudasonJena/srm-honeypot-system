@@ -1,99 +1,156 @@
-import Link from "next/link";
-import { ShieldAlert, Database, Cpu, Shield, Server, ArrowRight } from "lucide-react";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { OverviewMetrics, SystemHealth, Alert } from "@/lib/types";
+import { useRealtimeEvents } from "@/hooks/useRealtimeEvents";
+import MetricCard from "@/components/MetricCard";
+import ThreatBadge from "@/components/ThreatBadge";
+import LoadingState from "@/components/LoadingState";
+import ErrorState from "@/components/ErrorState";
+import { Activity, ShieldAlert, Server, Radar } from "lucide-react";
+
+export default function Overview() {
+  const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  // Hook into SSE
+  useRealtimeEvents((event) => {
+    // When a new event comes in, refresh the data
+    fetchData();
+  });
+
+  const fetchData = async () => {
+    try {
+      const [metricsData, healthData, alertsData] = await Promise.all([
+        api.getOverview().catch(() => null),
+        api.getSystemHealth().catch(() => null),
+        api.getAlerts().catch(() => [])
+      ]);
+
+      if (metricsData) setMetrics(metricsData);
+      if (healthData) setHealth(healthData);
+      setAlerts(alertsData);
+      setError(false);
+    } catch (err) {
+      console.error(err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    
+    // Polling fallback
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) return <LoadingState message="Loading SOC Overview..." />;
+  if (error && !metrics) return <ErrorState onRetry={fetchData} />;
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-4">
-      {/* Hero Section */}
-      <section className="max-w-4xl mx-auto text-center space-y-8 py-20 relative z-10">
-        <div className="absolute inset-0 -z-10 flex items-center justify-center">
-          <div className="w-64 h-64 bg-[var(--color-cyber-primary)] rounded-full blur-[100px] opacity-10"></div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--color-soc-text)]">SOC Overview</h1>
+          <p className="text-[var(--color-soc-text-muted)] text-sm">Real-time threat monitoring and system status</p>
         </div>
-        
-        <h1 className="text-5xl md:text-7xl font-bold font-mono tracking-tighter text-white">
-          THE TRAP IS <span className="text-[var(--color-cyber-primary)] text-glow">THE DATA.</span>
-        </h1>
-        
-        <p className="text-lg md:text-xl text-[var(--color-cyber-text)] max-w-2xl mx-auto font-sans leading-relaxed">
-          Project Labyrinth is an AI-powered RAG honeypot designed to detect attackers,
-          capture malicious reconnaissance, deploy canary credentials, and generate
-          real-time threat intelligence.
-        </p>
-        
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-          <Link href="/user" className="w-full sm:w-auto px-8 py-3 bg-[var(--color-cyber-panel)] hover:bg-[var(--color-cyber-border)] border border-blue-500/40 rounded-md font-mono text-white transition-all flex items-center justify-center group shadow-[0_0_15px_rgba(37,99,235,0.2)]">
-            <span className="text-blue-400 mr-2">◈</span>
-            Enter Corporate User Portal
-            <ArrowRight className="ml-2 h-4 w-4 text-blue-400 group-hover:translate-x-1 transition-transform" />
-          </Link>
-          <Link href="/dashboard" className="w-full sm:w-auto px-8 py-3 bg-[var(--color-cyber-primary)] hover:bg-[#00cc7d] text-black rounded-md font-mono font-bold shadow-[0_0_15px_rgba(0,255,157,0.4)] hover:shadow-[0_0_25px_rgba(0,255,157,0.6)] transition-all flex items-center justify-center">
-            Open Security Dashboard
-          </Link>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard 
+          title="Active Attacks" 
+          value={metrics?.activeAttacks || 0} 
+          icon={ShieldAlert}
+          colorClass="text-red-400" 
+        />
+        <MetricCard 
+          title="Critical Sessions" 
+          value={metrics?.criticalSessions || 0} 
+          icon={Radar}
+          colorClass="text-orange-400" 
+        />
+        <MetricCard 
+          title="Total Sessions" 
+          value={metrics?.totalSessions || 0} 
+          icon={Activity}
+          colorClass="text-[var(--color-soc-primary)]" 
+        />
+        <MetricCard 
+          title="Active Alerts" 
+          value={metrics?.activeAlerts || 0} 
+          icon={Server}
+          colorClass="text-yellow-400" 
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-[var(--color-soc-panel)] border border-[var(--color-soc-border)] rounded-xl p-5">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-[var(--color-soc-primary)]" />
+            Recent Alerts
+          </h2>
+          {alerts.length > 0 ? (
+            <div className="space-y-3">
+              {alerts.slice(0, 5).map((alert) => (
+                <div key={alert.id} className="p-3 bg-[var(--color-soc-surface)] border border-[var(--color-soc-border-light)] rounded-lg flex items-start gap-4">
+                  <ThreatBadge severity={alert.severity} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{alert.attackType}</p>
+                    <p className="text-xs text-[var(--color-soc-text-muted)]">{alert.description}</p>
+                  </div>
+                  <div className="text-xs text-[var(--color-soc-text-muted)] font-mono">
+                    {new Date(alert.timestamp).toLocaleTimeString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center p-8 text-[var(--color-soc-text-muted)] text-sm border border-dashed border-[var(--color-soc-border-light)] rounded-lg">
+              No active alerts at this time.
+            </div>
+          )}
         </div>
-      </section>
 
-      {/* Architecture Section */}
-      <section className="max-w-7xl mx-auto w-full py-16">
-        <h2 className="text-2xl font-mono text-center text-white mb-12">SYSTEM ARCHITECTURE</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          
-          <div className="glass-panel p-6 rounded-lg text-center flex flex-col items-center hover:border-[var(--color-cyber-primary)] transition-colors group">
-            <div className="w-12 h-12 bg-black/50 border border-[var(--color-cyber-border)] rounded-lg flex items-center justify-center mb-4 group-hover:text-[var(--color-cyber-primary)] transition-colors">
-              <Server className="h-6 w-6" />
+        <div className="bg-[var(--color-soc-panel)] border border-[var(--color-soc-border)] rounded-xl p-5">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Server className="w-5 h-5 text-green-400" />
+            System Health
+          </h2>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center p-3 bg-[var(--color-soc-surface)] rounded border border-[var(--color-soc-border-light)]">
+              <span className="text-sm font-medium">Backend API</span>
+              <span className={`text-xs font-mono px-2 py-1 rounded ${health?.status === "OPERATIONAL" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                {health?.status || "UNKNOWN"}
+              </span>
             </div>
-            <h3 className="font-mono font-bold text-white mb-2">Ingress Layer</h3>
-            <ul className="text-sm text-[var(--color-cyber-muted)] space-y-1">
-              <li>Fake Corporate Portal</li>
-              <li>Labyrinth AI Assistant</li>
-            </ul>
-          </div>
-
-          <div className="glass-panel p-6 rounded-lg text-center flex flex-col items-center hover:border-[var(--color-cyber-primary)] transition-colors group">
-            <div className="w-12 h-12 bg-black/50 border border-[var(--color-cyber-border)] rounded-lg flex items-center justify-center mb-4 group-hover:text-[var(--color-cyber-primary)] transition-colors">
-              <Database className="h-6 w-6" />
+            <div className="flex justify-between items-center p-3 bg-[var(--color-soc-surface)] rounded border border-[var(--color-soc-border-light)]">
+              <span className="text-sm font-medium">AI Worker</span>
+              <span className={`text-xs font-mono px-2 py-1 rounded ${health?.components.aiWorker === "UP" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                {health?.components.aiWorker || "UNKNOWN"}
+              </span>
             </div>
-            <h3 className="font-mono font-bold text-white mb-2">Queue Layer</h3>
-            <ul className="text-sm text-[var(--color-cyber-muted)] space-y-1">
-              <li>Redis</li>
-              <li>BullMQ</li>
-            </ul>
-          </div>
-
-          <div className="glass-panel p-6 rounded-lg text-center flex flex-col items-center hover:border-[var(--color-cyber-primary)] transition-colors group">
-            <div className="w-12 h-12 bg-black/50 border border-[var(--color-cyber-border)] rounded-lg flex items-center justify-center mb-4 group-hover:text-[var(--color-cyber-primary)] transition-colors">
-              <Shield className="h-6 w-6" />
+            <div className="flex justify-between items-center p-3 bg-[var(--color-soc-surface)] rounded border border-[var(--color-soc-border-light)]">
+              <span className="text-sm font-medium">Redis Queue</span>
+              <span className={`text-xs font-mono px-2 py-1 rounded ${health?.components.queue === "UP" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                {health?.components.queue || "UNKNOWN"}
+              </span>
             </div>
-            <h3 className="font-mono font-bold text-white mb-2">Retrieval Layer</h3>
-            <ul className="text-sm text-[var(--color-cyber-muted)] space-y-1">
-              <li>PostgreSQL</li>
-              <li>pgvector</li>
-            </ul>
-          </div>
-
-          <div className="glass-panel p-6 rounded-lg text-center flex flex-col items-center hover:border-[var(--color-cyber-accent)] transition-colors group">
-            <div className="w-12 h-12 bg-black/50 border border-[var(--color-cyber-border)] rounded-lg flex items-center justify-center mb-4 group-hover:text-[var(--color-cyber-accent)] transition-colors">
-              <Cpu className="h-6 w-6" />
+            <div className="flex justify-between items-center p-3 bg-[var(--color-soc-surface)] rounded border border-[var(--color-soc-border-light)]">
+              <span className="text-sm font-medium">RAG DB</span>
+              <span className={`text-xs font-mono px-2 py-1 rounded ${health?.components.rag === "UP" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                {health?.components.rag || "UNKNOWN"}
+              </span>
             </div>
-            <h3 className="font-mono font-bold text-white mb-2">Generation Layer</h3>
-            <ul className="text-sm text-[var(--color-cyber-muted)] space-y-1">
-              <li>Gemini AI</li>
-              <li>Canary Credentials</li>
-            </ul>
           </div>
-
-          <div className="glass-panel p-6 rounded-lg text-center flex flex-col items-center hover:border-[var(--color-cyber-alert)] transition-colors group">
-            <div className="w-12 h-12 bg-black/50 border border-[var(--color-cyber-border)] rounded-lg flex items-center justify-center mb-4 group-hover:text-[var(--color-cyber-alert)] transition-colors">
-              <ShieldAlert className="h-6 w-6" />
-            </div>
-            <h3 className="font-mono font-bold text-white mb-2">Threat Intel</h3>
-            <ul className="text-sm text-[var(--color-cyber-muted)] space-y-1">
-              <li>Breach Detection</li>
-              <li>AI Reports</li>
-            </ul>
-          </div>
-
         </div>
-      </section>
+      </div>
     </div>
   );
 }
