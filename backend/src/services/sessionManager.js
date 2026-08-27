@@ -161,6 +161,26 @@ async function addTimelineEntry(sessionId, eventType, details, metadata = {}) {
     const session = await getSession(sessionId);
     if (!session) return null;
     const entry = new TimelineEntry(eventType, details, metadata);
+
+    // Enhanced tracking: capture full request details for flagged attackers
+    if (session.enhancedTrackingEnabled && metadata) {
+        // Compute timing delta from previous timeline entry
+        if (session.timeline.length > 0) {
+            const prevEntry = session.timeline[session.timeline.length - 1];
+            const prevTime = new Date(prevEntry.timestamp).getTime();
+            const currTime = new Date(entry.timestamp).getTime();
+            entry.metadata.timingDeltaMs = currTime - prevTime;
+        }
+        // Preserve raw headers if passed in metadata (caller provides them)
+        if (metadata.rawHeaders) {
+            entry.metadata.rawHeaders = metadata.rawHeaders;
+        }
+        // Preserve full body if passed in metadata
+        if (metadata.rawBody !== undefined) {
+            entry.metadata.rawBody = metadata.rawBody;
+        }
+    }
+
     session.timeline.push(entry);
     // Bound timeline at 500 entries to prevent unbounded growth
     if (session.timeline.length > 500) session.timeline = session.timeline.slice(-500);

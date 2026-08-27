@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "latest",
+    "@huggingface/inference": "^4.13.28",
     "@supabase/supabase-js": "^2.39.7",
     "bullmq": "^5.4.2",
     "cors": "^2.8.5",

@@ -21,6 +21,7 @@ const http = require('http');
 
 const TARGET = 'http://localhost:5000';
 const DELAY_MS = 800; // Delay between requests to simulate human pace
+const runId = Math.random().toString(36).slice(2, 10);
 
 // ── SAFETY CHECK ────────────────────────────────────────────────────────────
 if (!TARGET.includes('localhost') && !TARGET.includes('127.0.0.1')) {
@@ -39,7 +40,7 @@ function makeRequest(method, path, body = null, headers = {}) {
             path: url.pathname + url.search,
             method,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 AttackSim/1.0',
+                'User-Agent': `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 AttackSim/1.0-${runId}`,
                 'Accept': 'application/json',
                 ...headers,
                 ...(body ? { 'Content-Type': 'application/json' } : {})

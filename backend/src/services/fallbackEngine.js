@@ -264,6 +264,23 @@ function selectTemplate(path, method) {
  */
 function generateFallbackResponse(path, method, deceptionState = {}) {
     const templateKey = selectTemplate(path, method);
+
+    // Check for ML-generated cached content (populated async by ragWorker)
+    if (deceptionState.contentCache && deceptionState.contentCache[templateKey]) {
+        const cached = deceptionState.contentCache[templateKey];
+        if (cached.statusCode && cached.body) {
+            log.info('Using cached ML-generated content', { templateKey });
+            return {
+                statusCode:   cached.statusCode,
+                body:         cached.body,
+                templateUsed: templateKey,
+                aiGenerated:  false,
+                mlCached:     true
+            };
+        }
+    }
+
+    // Fall through to static deterministic templates
     const template    = TEMPLATES[templateKey] || TEMPLATES.generic;
 
     const response = substitute(template, deceptionState);

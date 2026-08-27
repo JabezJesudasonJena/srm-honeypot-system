@@ -36,6 +36,7 @@ const WEIGHTS = {
     REPEATED_ADMIN_PROBING:             15,
     HIGH_REQUEST_VELOCITY:              10,
     MULTIPLE_METHODS:                   5,
+    ML_AUTOMATED_SIGNAL:                10,
 };
 
 // ── Severity Thresholds ─────────────────────────────────────────────────────
@@ -102,6 +103,9 @@ async function calculateScore(sessionId, intentResult) {
     session.threatScore = Math.min(100, session.threatScore + delta);
     session.threatSeverity = getSeverity(session.threatScore);
     session.detectedIntents.push(intentResult.intent);
+
+    // Check for enhanced tracking on severity transition above LOW
+    checkEnhancedTracking(sessionId, session);
 
     // Deduplicate reasons
     const uniqueReasons = [...new Set([...session.threatReasons, ...reasons])];
@@ -180,6 +184,73 @@ function classifyAttacker(session) {
     return classificationMap[dominant] || 'unknown';
 }
 
+// ── Enhanced Tracking ───────────────────────────────────────────────────────
+
+/**
+ * Enable enhanced tracking the first time a session's severity moves above LOW.
+ * Sets session.enhancedTrackingEnabled and session.flaggedAttackerAt.
+ *
+ * @param {string} sessionId
+ * @param {object} session – The live AttackSession object (mutated in-place)
+ */
+function checkEnhancedTracking(sessionId, session) {
+    if (session.enhancedTrackingEnabled) return;
+    if (session.threatSeverity !== 'LOW') {
+        session.enhancedTrackingEnabled = true;
+        session.flaggedAttackerAt = Date.now();
+        log.info('Enhanced tracking enabled', {
+            sessionId: typeof sessionId === 'string' ? sessionId.substring(0, 8) : sessionId,
+            severity: session.threatSeverity,
+            score: session.threatScore
+        });
+    }
+}
+
+// ── ML Signal Scoring ───────────────────────────────────────────────────────
+
+/**
+ * Apply a small threat score bump based on ML classifier output.
+ * Only applied when the label indicates non-human behavior with high confidence.
+ *
+ * @param {string} sessionId
+ * @param {{ label: string, confidence: number } | null} mlResult
+ * @returns {{ applied: boolean, delta: number }}
+ */
+async function applyMlSignal(sessionId, mlResult) {
+    if (!mlResult || mlResult.label === 'human manual exploration' || mlResult.confidence <= 0.7) {
+        return { applied: false, delta: 0 };
+    }
+
+    const session = await sessionManager.getSession(sessionId);
+    if (!session) return { applied: false, delta: 0 };
+
+    // Scale the weight by confidence (e.g. 0.85 confidence → 8.5, rounded to 9)
+    const delta = Math.round(WEIGHTS.ML_AUTOMATED_SIGNAL * mlResult.confidence);
+    const previousScore = session.threatScore;
+
+    session.threatScore = Math.min(100, session.threatScore + delta);
+    session.threatSeverity = getSeverity(session.threatScore);
+    checkEnhancedTracking(sessionId, session);
+
+    await sessionManager.saveSession(session);
+
+    await sessionManager.addTimelineEntry(
+        sessionId, 'ML_SIGNAL',
+        `ML classification: ${mlResult.label} (${(mlResult.confidence * 100).toFixed(0)}%) → +${delta}`,
+        { label: mlResult.label, confidence: mlResult.confidence, delta }
+    );
+
+    log.info('ML signal applied', {
+        sessionId: sessionId.substring(0, 8),
+        label: mlResult.label,
+        confidence: mlResult.confidence.toFixed(3),
+        delta,
+        newScore: session.threatScore
+    });
+
+    return { applied: true, delta };
+}
+
 /**
  * Get a snapshot of the current threat assessment for a session.
  */
@@ -199,4 +270,4 @@ async function getThreatAssessment(sessionId) {
     };
 }
 
-module.exports = { WEIGHTS, getSeverity, calculateScore, classifyAttacker, getThreatAssessment };
+module.exports = { WEIGHTS, getSeverity, calculateScore, classifyAttacker, checkEnhancedTracking, applyMlSignal, getThreatAssessment };

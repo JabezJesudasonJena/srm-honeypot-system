@@ -47,49 +47,58 @@ You are generating responses for a HONEYPOT — your goal is to make the attacke
  * @param {string} params.objective     – What the deception should achieve
  * @returns {object|null}               – Parsed JSON response or null on failure
  */
+const redis = require('../../config/redis');
+
 async function generateDeception({ request, intent, deceptionState, ragContext = [], objective }) {
     if (!AI_ENABLED) return null;
 
     const prompt = buildPrompt({ request, intent, deceptionState, ragContext, objective });
+    const cacheKey = `labyrinth:gemini-cache:${intent}:deception`;
 
-    for (let attempt = 1; attempt <= AI_MAX_RETRIES; attempt++) {
+    try {
+        const startTime = Date.now();
+        const result = await orchestrator.generateDeception(prompt, {
+            systemInstruction: SYSTEM_PROMPT,
+            format: 'json',
+            temperature: 0.7,
+            maxOutputTokens: 1024
+        });
+
+        if (!result || !result.text) throw new Error("Empty response from AI provider");
+
+        const latency = Date.now() - startTime;
+        const validation = validateJsonResponse(result.text, ['statusCode', 'body']);
+
+        if (!validation.valid) throw new Error(`Validation failed: ${validation.error}`);
+
+        const responseObj = { ...validation.data, aiGenerated: true, provider: result.provider, latencyMs: latency };
+        
+        // Cache success
+        await redis.setex(cacheKey, 900, JSON.stringify(responseObj));
+        
+        log.info('AI deception generated', { intent, provider: result.provider, latency: `${latency}ms` });
+        return responseObj;
+    } catch (err) {
+        log.warn(`[aiService] Gemini unavailable (${err.status || err.message}), using cached/mock fallback`);
+        
         try {
-            const startTime = Date.now();
-            
-            const result = await orchestrator.generateDeception(prompt, {
-                systemInstruction: SYSTEM_PROMPT,
-                format: 'json',
-                temperature: 0.7,
-                maxOutputTokens: 1024
-            });
-
-            if (!result || !result.text) {
-                log.warn(`AI provider returned null (attempt ${attempt})`);
-                continue;
-            }
-
-            const latency = Date.now() - startTime;
-            const text = result.text;
-            const validation = validateJsonResponse(text, ['statusCode', 'body']);
-
-            if (validation.valid) {
-                log.info('AI deception generated', { intent, provider: result.provider, latency: `${latency}ms`, attempt });
-                return { ...validation.data, aiGenerated: true, provider: result.provider, latencyMs: latency };
-            }
-
-            log.warn(`AI output validation failed (attempt ${attempt})`, { error: validation.error });
-
-        } catch (err) {
-            log.error(`AI generation failed (attempt ${attempt})`, { error: err.message });
-            if (attempt < AI_MAX_RETRIES) {
-                // Exponential backoff
-                await new Promise(r => setTimeout(r, 1000 * attempt));
-            }
+            const cached = await redis.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        } catch (cacheErr) {
+            log.warn('Cache read failed', { error: cacheErr.message });
         }
-    }
 
-    log.warn('All AI attempts exhausted — falling back');
-    return null;
+        // Mock fallback
+        return {
+            statusCode: 200,
+            body: { "status": "active", "message": `Simulated generic response for intent ${intent}` },
+            newAssets: [{ type: "service", data: { name: "fallback-service" } }],
+            suggestedCanary: true,
+            aiGenerated: false,
+            provider: "cache/mock",
+            latencyMs: 50
+        };
+    }
 }
 
 // ── Prompt Builder ──────────────────────────────────────────────────────────

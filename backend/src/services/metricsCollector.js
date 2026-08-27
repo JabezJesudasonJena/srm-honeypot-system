@@ -19,6 +19,7 @@ const metrics = {
     orchestratorRequests:0,
     geminiCalls:         0,
     hfCalls:             0,
+    mlCalls:             0,
     queueDepth:          0,
     canariesGenerated:   0,
     canariesTriggered:   0,

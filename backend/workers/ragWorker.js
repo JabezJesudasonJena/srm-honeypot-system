@@ -12,9 +12,10 @@
 //   4. Progress attack stage
 //   5. Reveal appropriate assets in deception state
 //   6. Retrieve RAG context (semantic search)
-//   7. Generate AI deception (if available)
-//   8. Store event
-//   9. Update metrics
+//   7. Generate AI deception (if available, Gemini)
+//   8. ML classification (HF zero-shot, behavioral profiling)
+//   9. HF content generation & caching (flan-t5-large)
+//  10. Store event & update metrics
 // ============================================================================
 
 const { Worker } = require('bullmq');
@@ -25,13 +26,15 @@ const sessionManager   = require('../src/services/sessionManager');
 const deceptionEngine  = require('../src/services/deceptionEngine');
 const intentDetector   = require('../src/services/intentDetector');
 const threatScorer     = require('../src/services/threatScorer');
-const canaryManager    = require('../src/services/canaryManager');
-const ragService       = require('../src/services/ragService');
-const aiService        = require('../src/services/aiService');
-const fallbackEngine   = require('../src/services/fallbackEngine');
-const metricsCollector = require('../src/services/metricsCollector');
-const attackerProfiler = require('../src/services/attackerProfiler');
-const { AttackEvent }  = require('../src/models/schemas');
+const canaryManager      = require('../src/services/canaryManager');
+const ragService         = require('../src/services/ragService');
+const aiService          = require('../src/services/aiService');
+const fallbackEngine     = require('../src/services/fallbackEngine');
+const metricsCollector   = require('../src/services/metricsCollector');
+const attackerProfiler   = require('../src/services/attackerProfiler');
+const mlClassifier       = require('../src/services/mlClassifier');
+const contentGenerator   = require('../src/services/contentGenerator');
+const { AttackEvent }    = require('../src/models/schemas');
 
 const log = createLogger('RAGWorker');
 
@@ -177,7 +180,61 @@ const worker = new Worker('attacker-probes', async (job) => {
             }
         }
 
-        // ── 7. Store Event ──
+        // ── 7. ML Classification & Content Generation (HF, async) ──
+        let mlResult = null;
+        try {
+            const requestSummary = `${probeData.method} ${probeData.path} intent:${intent.intent} confidence:${intent.confidence}`;
+            mlResult = await mlClassifier.classifyRequestBehavior(requestSummary);
+
+            if (mlResult) {
+                // Store classification on session
+                const freshSession = await sessionManager.getSession(sessionId);
+                if (freshSession) {
+                    freshSession.lastMlClassification = mlResult;
+                    await sessionManager.saveSession(freshSession);
+                }
+
+                // Apply ML-informed score bump
+                const mlScoreResult = await threatScorer.applyMlSignal(sessionId, mlResult);
+                if (mlScoreResult.applied) {
+                    const bc4 = getBroadcast();
+                    if (bc4) bc4('ML_CLASSIFICATION', { sessionId, label: mlResult.label, confidence: mlResult.confidence });
+                }
+
+                metricsCollector.increment('hfCalls');
+            }
+        } catch (err) {
+            log.warn('ML classification step failed (non-fatal)', { error: err.message });
+        }
+
+        // ── 8. HF Content Generation & Caching ──
+        try {
+            const endpointType = fallbackEngine.selectTemplate(probeData.path, probeData.method);
+            const deceptionState = await deceptionEngine.getDeceptionState(sessionId);
+
+            // Only generate if we don't already have cached content for this type
+            if (!deceptionState.contentCache || !deceptionState.contentCache[endpointType]) {
+                const fakeContent = await contentGenerator.generateFakeContent(endpointType, deceptionState);
+                if (fakeContent) {
+                    if (!deceptionState.contentCache) deceptionState.contentCache = {};
+                    deceptionState.contentCache[endpointType] = fakeContent;
+
+                    // Persist updated deception state
+                    const cacheSession = await sessionManager.getSession(sessionId);
+                    if (cacheSession) {
+                        cacheSession.deceptionState = deceptionState;
+                        await sessionManager.saveSession(cacheSession);
+                    }
+
+                    metricsCollector.increment('hfCalls');
+                    log.info('ML content cached', { endpointType, sessionId: sessionId.substring(0, 8) });
+                }
+            }
+        } catch (err) {
+            log.warn('Content generation step failed (non-fatal)', { error: err.message });
+        }
+
+        // ── 9. Store Event ──
         const event = new AttackEvent({
             sessionId,
             method: probeData.method,
@@ -225,7 +282,7 @@ const worker = new Worker('attacker-probes', async (job) => {
             await sessionManager.saveSession(session);
         }
 
-        // ── 8. Update Metrics ──
+        // ── 10. Update Metrics ──
         metricsCollector.increment('totalProcessingMs', event.processingLatencyMs);
 
         // Update active attack count

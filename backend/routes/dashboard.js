@@ -310,5 +310,27 @@ router.get('/events/stream', (req, res) => {
     });
 });
 
+// ── POST /simulate (Attack Simulation) ──────────────────────────────────────
+
+router.post('/simulate', async (req, res) => {
+    try {
+        const { scenario } = req.body;
+        if (!scenario) return res.status(400).json({ error: 'Scenario name is required' });
+        
+        // Quick and dirty spawn to unblock the demo
+        const { spawn } = require('child_process');
+        const path = require('path');
+        const simPath = path.join(__dirname, '../simulator/attackSimulator.js');
+        
+        // Run in background without waiting for it to finish
+        const child = spawn('node', [simPath, scenario], { detached: true, stdio: 'ignore' });
+        child.unref();
+        
+        res.json({ status: 'success', message: `Simulator launched for scenario: ${scenario}` });
+    } catch (err) {
+        res.status(500).json({ error: 'Simulator launch failed', message: err.message });
+    }
+});
+
 module.exports = router;
 module.exports.broadcastEvent = broadcastEvent;

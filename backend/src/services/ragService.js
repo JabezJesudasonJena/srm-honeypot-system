@@ -148,35 +148,10 @@ async function seedKnowledgeBase() {
  * @returns {string[]}   – Array of document content strings
  */
 async function searchContext(query, topK = 3) {
-    try {
-        const embedding = await generateEmbedding(query);
-        if (!embedding) {
-            log.debug('Embedding unavailable — using keyword fallback');
-            return keywordFallback(query);
-        }
-
-        const { data, error } = await supabase.rpc('match_documents', {
-            query_embedding: embedding,
-            match_threshold: 0.4,
-            match_count: topK
-        });
-
-        if (error) {
-            log.warn('Vector search failed — using keyword fallback', { error: error.message });
-            return keywordFallback(query);
-        }
-
-        if (!data || data.length === 0) {
-            return keywordFallback(query);
-        }
-
-        log.info('RAG context retrieved', { matches: data.length, topSimilarity: data[0]?.similarity });
-        return data.map(d => `[${d.title}] ${d.content}`);
-
-    } catch (err) {
-        log.error('RAG search failed', { error: err.message });
-        return keywordFallback(query);
-    }
+    // WORKAROUND: Supabase vector search is skipped due to missing schema (PGRST202)
+    // and network blocks on embedding models. Falling back immediately to local keyword search.
+    log.debug('Bypassing vector search — using local keyword fallback');
+    return keywordFallback(query);
 }
 
 /**
