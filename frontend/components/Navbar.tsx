@@ -20,17 +20,19 @@ export default function Navbar() {
               <Link href="/" className="text-sm font-medium text-gray-300 hover:text-white hover:text-glow transition-all">
                 Home
               </Link>
-              <Link href="/wiki" className="text-sm font-medium text-gray-300 hover:text-white hover:text-glow transition-all">
-                Wiki
+              <Link href="/user" className="text-sm font-medium text-blue-400 hover:text-blue-300 hover:text-glow transition-all flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                User Portal
               </Link>
-              <Link href="/dashboard" className="text-sm font-medium text-gray-300 hover:text-white hover:text-glow transition-all">
-                Dashboard
+              <Link href="/dashboard" className="text-sm font-medium text-emerald-400 hover:text-emerald-300 hover:text-glow transition-all flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Admin SOC
               </Link>
             </div>
             
             <div className="flex items-center space-x-2 bg-black/40 px-3 py-1 rounded-full border border-[var(--color-cyber-border)]">
               <div className="w-2 h-2 rounded-full bg-[var(--color-cyber-primary)] animate-pulse shadow-[0_0_8px_var(--color-cyber-primary)]"></div>
-              <span className="text-xs font-mono text-[var(--color-cyber-primary)]">SYSTEM ACTIVE</span>
+              <span className="text-xs font-mono text-[var(--color-cyber-primary)]">HONEYPOT ACTIVE</span>
             </div>
           </div>
 

@@ -21,9 +21,10 @@ export default function Home() {
         </p>
         
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-          <Link href="/wiki" className="w-full sm:w-auto px-8 py-3 bg-[var(--color-cyber-panel)] hover:bg-[var(--color-cyber-border)] border border-[var(--color-cyber-border)] rounded-md font-mono text-white transition-all flex items-center justify-center group">
-            Enter Corporate Wiki
-            <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+          <Link href="/user" className="w-full sm:w-auto px-8 py-3 bg-[var(--color-cyber-panel)] hover:bg-[var(--color-cyber-border)] border border-blue-500/40 rounded-md font-mono text-white transition-all flex items-center justify-center group shadow-[0_0_15px_rgba(37,99,235,0.2)]">
+            <span className="text-blue-400 mr-2">◈</span>
+            Enter Corporate User Portal
+            <ArrowRight className="ml-2 h-4 w-4 text-blue-400 group-hover:translate-x-1 transition-transform" />
           </Link>
           <Link href="/dashboard" className="w-full sm:w-auto px-8 py-3 bg-[var(--color-cyber-primary)] hover:bg-[#00cc7d] text-black rounded-md font-mono font-bold shadow-[0_0_15px_rgba(0,255,157,0.4)] hover:shadow-[0_0_25px_rgba(0,255,157,0.6)] transition-all flex items-center justify-center">
             Open Security Dashboard
@@ -42,8 +43,8 @@ export default function Home() {
             </div>
             <h3 className="font-mono font-bold text-white mb-2">Ingress Layer</h3>
             <ul className="text-sm text-[var(--color-cyber-muted)] space-y-1">
-              <li>Fake Corporate Wiki</li>
-              <li>Request Monitoring</li>
+              <li>Fake Corporate Portal</li>
+              <li>Labyrinth AI Assistant</li>
             </ul>
           </div>
 
