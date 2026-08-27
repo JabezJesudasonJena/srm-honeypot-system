@@ -11,7 +11,7 @@ export default function Navbar() {
             <Shield className="h-6 w-6 text-[var(--color-cyber-primary)]" />
             <Link href="/" className="font-mono font-bold text-xl tracking-wider text-white text-glow flex items-center">
               <span className="text-[var(--color-cyber-primary)] mr-2">◈</span>
-              PROJECT LABYRINTH
+              Cyber Deception Engine
             </Link>
           </div>
 

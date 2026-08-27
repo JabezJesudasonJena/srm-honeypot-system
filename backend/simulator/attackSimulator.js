@@ -357,7 +357,7 @@ async function scenarioFullAdaptiveAttack() {
 async function main() {
     const scenario = process.argv.find(a => a.startsWith('--scenario'))
         ? process.argv[process.argv.indexOf('--scenario') + 1]
-        : 'full-attack-chain';
+        : 'full-adaptive-attack';
 
     console.log('🛡️  Project Labyrinth — Attack Simulator');
     console.log(`🎯 Target: ${TARGET}`);

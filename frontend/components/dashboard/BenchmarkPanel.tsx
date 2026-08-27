@@ -17,7 +17,7 @@ export default function BenchmarkPanel() {
     <div className="bg-soc-panel border border-soc-border rounded-lg">
       <div className="px-4 py-3 border-b border-soc-border">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-soc-text-secondary">
-          Static Honeypot vs Labyrinth
+          Static Honeypot vs Cyber Deception Engine
         </h2>
       </div>
       <div className="p-4">

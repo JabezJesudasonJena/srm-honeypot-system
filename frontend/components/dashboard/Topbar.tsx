@@ -41,7 +41,7 @@ export default function Topbar() {
       <div className="flex items-center gap-4">
         <div>
           <h1 className="text-sm font-semibold text-soc-text tracking-wide leading-none">
-            PROJECT LABYRINTH
+            Cyber Deception Engine
           </h1>
           <p className="text-[10px] text-soc-text-muted leading-none mt-0.5">
             Adaptive Cyber Deception

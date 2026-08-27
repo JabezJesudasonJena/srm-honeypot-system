@@ -21,7 +21,7 @@ async function verify() {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
     // Simple query to verify connection
     const { data, error } = await supabase.from('knowledge_base').select('id').limit(1);
-    if (error && error.code !== '42P01') {
+    if (error && error.code !== '42P01' && error.code !== 'PGRST116' && !error.message.includes('Could not find the table')) {
        throw error;
     }
     console.log('✅ Supabase (Postgres) is reachable');
@@ -32,7 +32,7 @@ async function verify() {
   // 3. Gemini
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
     const result = await model.generateContent("Respond with exactly 'OK'");
     const text = result.response.text().trim();
     if (text.includes('OK')) {
