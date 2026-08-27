@@ -55,6 +55,7 @@ class AttackSession {
         this.attackStage       = 'initial';
         this.timeline          = [];
         this.replayEvents      = [];
+        this.scoreHistory      = [];
         this.active            = true;
     }
 

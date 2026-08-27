@@ -19,6 +19,7 @@ const { createLogger } = require('./src/utils/logger');
 const sessionTracker   = require('./src/middleware/sessionTracker');
 const dashboardRoutes  = require('./routes/dashboard');
 const trapRoute        = require('./routes/trap');
+const { dashboardRouter: transactionDashboardRoutes, publicRouter: transactionPublicRoutes } = require('./routes/transaction');
 
 // Initialize the BullMQ worker (starts processing jobs immediately)
 require('./workers/ragWorker');
@@ -50,12 +51,19 @@ app.use(morgan('combined'));
 // are not captured as attacker probes.
 
 app.use('/labyrinth-api', dashboardRoutes);
+app.use('/labyrinth-api', transactionDashboardRoutes);
 
 // ── Session Tracking Middleware ─────────────────────────────────────────────
 // Every request after this point gets an attack session assigned.
 // Dashboard routes above are excluded.
 
 app.use(sessionTracker());
+
+// ── Transaction URL Route ───────────────────────────────────────────────────
+// Mounted AFTER session tracking (needs req.attackSession) but BEFORE the
+// catch-all trap so it doesn't get swallowed by the honeypot sinkhole.
+
+app.use(transactionPublicRoutes);
 
 // ── Catch-All Trap Route ────────────────────────────────────────────────────
 // The honeypot sinkhole — captures every request and returns adaptive

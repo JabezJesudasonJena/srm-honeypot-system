@@ -30,6 +30,7 @@ const WEIGHTS = {
     [INTENTS.API_EXPLOITATION]:         25,
     [INTENTS.PERSISTENCE_ATTEMPT]:      30,
     [INTENTS.CANARY_REUSE]:             40,
+    'UNAUTHORIZED_TRANSACTION_ACCESS':  25,
     [INTENTS.UNKNOWN]:                  5,
 
     // Bonus modifiers
@@ -66,11 +67,15 @@ async function calculateScore(sessionId, intentResult) {
     const previousScore = session.threatScore;
     const reasons = [];
     let delta = 0;
+    
+    session.scoreHistory = session.scoreHistory || [];
+    const newHistory = [];
 
     // Base score from intent
     const baseWeight = WEIGHTS[intentResult.intent] || 5;
     delta += baseWeight;
     reasons.push(...intentResult.reasons);
+    newHistory.push({ reason: `Intent detected: ${intentResult.intent}`, delta: baseWeight, timestamp: Date.now() });
 
     // Bonus: repeated admin probing (3+ admin endpoint visits)
     const adminVisits = session.endpointsVisited.filter(e =>
@@ -79,25 +84,34 @@ async function calculateScore(sessionId, intentResult) {
     if (adminVisits >= 3) {
         delta += WEIGHTS.REPEATED_ADMIN_PROBING;
         reasons.push('Repeated administrative endpoint probing');
+        newHistory.push({ reason: 'Repeated administrative endpoint probing', delta: WEIGHTS.REPEATED_ADMIN_PROBING, timestamp: Date.now() });
     }
 
     // Bonus: high request velocity (more than 20 requests)
     if (session.requestCount > 20) {
         delta += WEIGHTS.HIGH_REQUEST_VELOCITY;
         reasons.push('High request velocity detected');
+        newHistory.push({ reason: 'High request velocity detected', delta: WEIGHTS.HIGH_REQUEST_VELOCITY, timestamp: Date.now() });
     }
 
     // Bonus: using multiple HTTP methods (suggests manual exploration)
     if (session.httpMethods.length >= 3) {
         delta += WEIGHTS.MULTIPLE_METHODS;
         reasons.push('Multiple HTTP methods used (manual exploration likely)');
+        newHistory.push({ reason: 'Multiple HTTP methods used (manual exploration likely)', delta: WEIGHTS.MULTIPLE_METHODS, timestamp: Date.now() });
     }
 
     // Apply diminishing returns for repeated same-intent events
     const sameIntentCount = session.detectedIntents.filter(i => i === intentResult.intent).length;
     if (sameIntentCount > 2) {
+        const oldDelta = delta;
         delta = Math.max(1, Math.floor(delta * 0.3)); // Diminish after 2+ same intent
+        if (oldDelta !== delta) {
+            newHistory.push({ reason: 'Diminishing returns adjustment for repeated behavior', delta: delta - oldDelta, timestamp: Date.now() });
+        }
     }
+    
+    session.scoreHistory.push(...newHistory);
 
     // Update session
     session.threatScore = Math.min(100, session.threatScore + delta);
@@ -223,10 +237,14 @@ async function applyMlSignal(sessionId, mlResult) {
 
     const session = await sessionManager.getSession(sessionId);
     if (!session) return { applied: false, delta: 0 };
+    
+    session.scoreHistory = session.scoreHistory || [];
 
     // Scale the weight by confidence (e.g. 0.85 confidence → 8.5, rounded to 9)
     const delta = Math.round(WEIGHTS.ML_AUTOMATED_SIGNAL * mlResult.confidence);
     const previousScore = session.threatScore;
+    
+    session.scoreHistory.push({ reason: `ML automated signal: ${mlResult.label}`, delta, timestamp: Date.now() });
 
     session.threatScore = Math.min(100, session.threatScore + delta);
     session.threatSeverity = getSeverity(session.threatScore);
